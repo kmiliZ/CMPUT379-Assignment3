@@ -1,10 +1,17 @@
-all:	client server
+CC = g++
+OBJ = client commands.o server
+CFLAGS= -O -Wall -pthread
 
-client:	client.cpp
-	gcc -O client.cpp -o client
+all: $(OBJ)
 
-server:	server.cpp
-	gcc -O server.cpp -o server
+client:	client.cpp commands.o
+	$(CC) $(CFLAGS) client.cpp commands.o -o client
 
+server:	server.cpp commands.o
+	$(CC) $(CFLAGS) server.cpp commands.o -o server
+
+commands.o:
+	$(CC) $(CFLAGS) -c commands.cpp
 clean:
-	rm -f client server
+	rm -f $(OBJ)
+

@@ -11,15 +11,19 @@
 #include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include "header.h"
 
+// TODO: execute the revied transaction task
+// TODO: log transationcs in file
+// deal with 30 secs od no incoming messages, the server should exit
 int main(int argc, char *argv[])
 {
     int listenfd = 0, connfd = 0;
     struct sockaddr_in serv_addr;
-    int bytes;
+    int readBytes, writeBytes;
 
-    char sendBuff[1025];
-    time_t ticks;
+    char sendBuff[1024];
+    char buffer[1024];
 
     listenfd = socket(AF_INET, SOCK_STREAM, 0);
     if (listenfd < 0)
@@ -55,18 +59,19 @@ int main(int argc, char *argv[])
             perror("Accept");
             exit(EXIT_FAILURE);
         }
+
         printf("connection made\n");
 
-        ticks = time(NULL);
-        snprintf(sendBuff, sizeof(sendBuff), "%.24s\r\n", ctime(&ticks));
-        bytes = write(connfd, sendBuff, strlen(sendBuff));
-        printf("data received: %d bytes\n", bytes);
-        if (bytes != strlen(sendBuff))
-        {
-            perror("Write failed");
-            exit(1);
-        }
-        printf("data received: %s\n", sendBuff);
+        // TODO: read the actual task and n, log to file
+        readBytes = read(connfd, buffer, 1024);
+        printf("data read: %d bytes\n", readBytes);
+        printf("Received from server: %s\n", buffer);
+
+        // TODO: 123 just a place holder. should be the actaul number of n which was recieved from client
+        snprintf(sendBuff, sizeof(sendBuff), "%d", 123);
+
+        writeBytes = send(connfd, sendBuff, strlen(sendBuff), 0);
+        printf("write to client:finished");
 
         close(connfd);
         sleep(1);
