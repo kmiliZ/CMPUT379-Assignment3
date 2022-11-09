@@ -15,7 +15,8 @@
 #include <string>
 #include <map>
 #include <chrono>
-
+#include <cstring>
+#include <iostream>
 using namespace std;
 using namespace chrono;
 typedef system_clock Clock;
@@ -46,10 +47,10 @@ void logSummary(map<string, int> clientRecords)
     fprintf(fp, "SUMMARY\n");
     for (auto const &client : clientRecords)
     {
-        fprintf(fp, "   %3d transactions from %s\n", client.second, client.first);
+        fprintf(fp, "   %3d transactions from %s\n", client.second, client.first.c_str());
     }
     float duration = getTimeDuration();
-    fprintf(fp, "%.1f Transactions/sec (%d/%.2f)", (float)taskCount / duration, taskCount, duration);
+    fprintf(fp, "%.1f Transactions/sec (%d/%.2f)", (float)(taskCount - 1) / (duration - 30), taskCount - 1, duration - 30);
 }
 
 int main(int argc, char *argv[])
@@ -64,8 +65,8 @@ int main(int argc, char *argv[])
     taskCount = 1;
     map<string, int> clientRecords;
 
-    char sendBuff[1024] = {0};
-    char readbuffer[1024] = {0};
+    char sendBuff[1024] = {'\0'};
+    char readbuffer[1024] = {'\0'};
 
     if (argc != 2)
     {
@@ -161,32 +162,30 @@ int main(int argc, char *argv[])
                 exit(EXIT_FAILURE);
             }
 
-            // printf("New connection , socket fd is %d , ip is : %s , port : %d \n ", newfd, inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
+            printf("New connection , socket fd is %d , ip is : %s , port : %d \n ", newfd, inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
 
             // TODO: read the actual task and n, log to file
-            readBytes = read(newfd, readbuffer, 1024);
+            memset(readbuffer, '\0', sizeof readbuffer);
+            readBytes = recv(newfd, readbuffer, 1024, 0);
             // printf("data read: %d bytes\n", readBytes);
             // printf("Received from server: %s\n", readbuffer);
 
             int n, pid;
-            char clientName[100];
+            char clientName[100] = {'\0'};
             sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
             char machineName[50];
-            sprintf(machineName, "%s.%d", clientName, pid);
+            sprintf(machineName, "%s.%d\0", clientName, pid);
             logTaskCall(machineName, n);
 
             // perform work
             Trans(n);
 
-            // TODO: 123 just a place holder. should be the actaul number of n which was recieved from client
             snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
 
             writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
             logDone(machineName);
-            string machineNameStr = "";
-            machineNameStr = machineName;
-            printf("clientStr: %s", machineNameStr);
-            clientRecords.emplace(machineNameStr, 1);
+
+            clientRecords.emplace(string(machineName), 1);
             taskCount++;
 
             // add new socket to array of sockets
@@ -208,7 +207,9 @@ int main(int argc, char *argv[])
             {
                 // Check if it was for closing , and also read the
                 // incoming message
-                readBytes = read(newfd, readbuffer, 1024);
+                memset(readbuffer, '\0', sizeof readbuffer);
+
+                readBytes = recv(newfd, readbuffer, 1024, 0);
 
                 if (readBytes == 0)
                 {
@@ -232,10 +233,12 @@ int main(int argc, char *argv[])
                     // set the string terminating NULL byte on the end
                     // of the data read
                     int n, pid;
-                    char clientName[100];
+                    char clientName[100] = {'\0'};
                     sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
-                    char machineName[50];
+                    char machineName[50] = {'\0'};
+
                     sprintf(machineName, "%s.%d", clientName, pid);
+
                     logTaskCall(machineName, n);
 
                     // perform work
@@ -245,10 +248,8 @@ int main(int argc, char *argv[])
 
                     writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
                     logDone(machineName);
-                    string machineNameStr = "";
-                    machineNameStr = machineName;
-                    printf("clientStr: %s", machineNameStr);
-                    clientRecords.at(machineNameStr)++;
+
+                    clientRecords.at(string(machineName))++;
                     taskCount++;
                 }
             }

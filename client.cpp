@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     }
     char command_type;
     int command_n;
-    char sendBuff[1024];
+    char sendBuff[1024] = {'\n'};
     char hostName[100];
 
     // get pid
@@ -105,18 +105,17 @@ int main(int argc, char *argv[])
         if (command_type == 'T')
         {
             printf("writing something\n");
-            // send the task to server
+            memset(sendBuff, '\0', sizeof sendBuff);
+
             snprintf(sendBuff, sizeof(sendBuff), "%d %s %d", command_n, hostName, pid);
             writeBytes = send(sockfd, sendBuff, strlen(sendBuff), 0);
-            // TODO:log sending the serd(T num)
 
-            printf("write to server\n");
             logTransactionCall('T', command_n);
             totalTransactions++;
             readBytes = read(sockfd, recvBuff, sizeof(recvBuff));
             int n;
-            char message[2];
-            sscanf(recvBuff, "%s%d", &message, &n);
+            char ack[3];
+            sscanf(recvBuff, "%s%d", &ack, &n);
 
             if (readBytes < 0)
             {
@@ -124,7 +123,7 @@ int main(int argc, char *argv[])
             }
             // log receive to file
             logTransactionCall('D', command_n);
-            printf("Received from server: %s\n", message);
+            printf("Received from server: %s\n", ack);
         }
         else if (command_type == 'S')
         {
