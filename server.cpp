@@ -12,68 +12,247 @@
 #include <sys/types.h>
 #include <time.h>
 #include "header.h"
+#include <string>
+#include <map>
+#include <chrono>
 
-// TODO: execute the revied transaction task
-// TODO: log transationcs in file
-// deal with 30 secs od no incoming messages, the server should exit
+using namespace std;
+using namespace chrono;
+typedef system_clock Clock;
+
+FILE *fp;
+int taskCount;
+Clock::time_point startTime;
+
+float getTimeDuration()
+{
+    Clock::time_point now = Clock::now();
+    duration<double> duration = now - startTime;
+    return duration.count();
+}
+
+void logTaskCall(char *clientName, int n)
+{
+    fprintf(fp, "# %3d (T%3d) from %s\n", taskCount, n, clientName);
+}
+void logDone(char *clientName)
+{
+    fprintf(fp, "# %3d (Done) from %s\n", taskCount, clientName);
+}
+
+void logSummary(map<string, int> clientRecords)
+{
+
+    fprintf(fp, "SUMMARY\n");
+    for (auto const &client : clientRecords)
+    {
+        fprintf(fp, "   %3d transactions from %s\n", client.second, client.first);
+    }
+    float duration = getTimeDuration();
+    fprintf(fp, "%.1f Transactions/sec (%d/%.2f)", (float)taskCount / duration, taskCount, duration);
+}
+
 int main(int argc, char *argv[])
 {
-    int listenfd = 0, connfd = 0;
+    startTime = Clock::now();
+
+    int master_socket = 0, connfd, nfds, newfd;
+    int client_sockets[MAX_CLIENTS];
     struct sockaddr_in serv_addr;
     int readBytes, writeBytes;
+    struct timeval timeout;
+    taskCount = 1;
+    map<string, int> clientRecords;
 
-    char sendBuff[1024];
-    char buffer[1024];
+    char sendBuff[1024] = {0};
+    char readbuffer[1024] = {0};
 
-    listenfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (listenfd < 0)
+    if (argc != 2)
+    {
+        printf("\n Usage: %s <port number> \n", argv[0]);
+        return 1;
+    }
+
+    int port = atoi(argv[1]);
+
+    // set of socket descriptors
+    fd_set readfds;
+
+    string readLine;
+
+    master_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (master_socket < 0)
     {
         perror("Socket failtd");
         exit(EXIT_FAILURE);
     }
     memset(&serv_addr, '0', sizeof(serv_addr));
-    memset(sendBuff, '0', sizeof(sendBuff));
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(5002);
+    serv_addr.sin_port = htons(port);
 
-    if (bind(listenfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+    if (bind(master_socket, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
     {
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
 
-    if (listen(listenfd, 10) < 0)
+    // maximum of 10 pending connections for the master socket
+    if (listen(master_socket, 10) < 0)
     {
         perror("listen");
         exit(EXIT_FAILURE);
     }
 
+    // initialise all client_socket[] to 0 so not checked
+    for (int i = 0; i < MAX_CLIENTS; i++)
+    {
+        client_sockets[i] = 0;
+    }
+
+    timeout.tv_sec = 30;
+    timeout.tv_usec = 0;
+    fp = fopen("server.log", "w");
+    fprintf(fp, "Using port %d\n", port);
     while (1)
     {
         printf("wait for a connection\n");
-        connfd = accept(listenfd, (struct sockaddr *)NULL, NULL);
-        if (connfd < 0)
+
+        // clear the socket set
+        FD_ZERO(&readfds);
+
+        // add master socket to set
+        FD_SET(master_socket, &readfds);
+        nfds = master_socket;
+        // add child sockets to set
+        for (int i = 0; i < MAX_CLIENTS; i++)
         {
-            perror("Accept");
-            exit(EXIT_FAILURE);
+            // socket descriptor
+            connfd = client_sockets[i];
+
+            // if valid socket descriptor then add to read list
+            if (connfd > 0)
+                FD_SET(connfd, &readfds);
+
+            // highest file descriptor number, need it for the select function
+            if (connfd > nfds)
+                nfds = connfd;
         }
 
-        printf("connection made\n");
+        int activity = select(nfds + 1, &readfds, NULL, NULL, &timeout);
 
-        // TODO: read the actual task and n, log to file
-        readBytes = read(connfd, buffer, 1024);
-        printf("data read: %d bytes\n", readBytes);
-        printf("Received from server: %s\n", buffer);
+        if (activity < 0)
+        {
+            perror("select");
+        }
+        else if (activity == 0)
+        {
+            printf("server timeout");
+            break;
+        }
 
-        // TODO: 123 just a place holder. should be the actaul number of n which was recieved from client
-        snprintf(sendBuff, sizeof(sendBuff), "%d", 123);
+        // new connection
+        if (FD_ISSET(master_socket, &readfds))
+        {
+            if ((newfd = accept(master_socket, (struct sockaddr *)NULL, NULL)) < 0)
+            {
+                perror("Accept");
+                exit(EXIT_FAILURE);
+            }
 
-        writeBytes = send(connfd, sendBuff, strlen(sendBuff), 0);
-        printf("write to client:finished");
+            // printf("New connection , socket fd is %d , ip is : %s , port : %d \n ", newfd, inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
 
-        close(connfd);
-        sleep(1);
+            // TODO: read the actual task and n, log to file
+            readBytes = read(newfd, readbuffer, 1024);
+            // printf("data read: %d bytes\n", readBytes);
+            // printf("Received from server: %s\n", readbuffer);
+
+            int n, pid;
+            char clientName[100];
+            sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
+            char machineName[50];
+            sprintf(machineName, "%s.%d", clientName, pid);
+            logTaskCall(machineName, n);
+
+            // perform work
+            Trans(n);
+
+            // TODO: 123 just a place holder. should be the actaul number of n which was recieved from client
+            snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
+
+            writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
+            logDone(machineName);
+            string machineNameStr = "";
+            machineNameStr = machineName;
+            printf("clientStr: %s", machineNameStr);
+            clientRecords.emplace(machineNameStr, 1);
+            taskCount++;
+
+            // add new socket to array of sockets
+            for (int i = 0; i < MAX_CLIENTS; i++)
+            {
+                // if position is empty
+                if (client_sockets[i] == 0)
+                {
+                    client_sockets[i] = newfd;
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < MAX_CLIENTS; i++)
+        {
+            connfd = client_sockets[i];
+
+            if (FD_ISSET(connfd, &readfds))
+            {
+                // Check if it was for closing , and also read the
+                // incoming message
+                readBytes = read(newfd, readbuffer, 1024);
+
+                if (readBytes == 0)
+                {
+                    // Somebody disconnected , get his details and print
+                    getpeername(connfd, (struct sockaddr *)&serv_addr,
+                                (socklen_t *)&serv_addr);
+                    printf("Host disconnected , ip %s , port %d \n",
+                           inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
+
+                    // Close the socket and mark as 0 in list for reuse
+                    close(connfd);
+                    client_sockets[i] = 0;
+                }
+                else if (readBytes < 0)
+                {
+                    perror("read");
+                }
+                // Echo back the message that came in
+                else
+                {
+                    // set the string terminating NULL byte on the end
+                    // of the data read
+                    int n, pid;
+                    char clientName[100];
+                    sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
+                    char machineName[50];
+                    sprintf(machineName, "%s.%d", clientName, pid);
+                    logTaskCall(machineName, n);
+
+                    // perform work
+                    Trans(n);
+
+                    snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
+
+                    writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
+                    logDone(machineName);
+                    string machineNameStr = "";
+                    machineNameStr = machineName;
+                    printf("clientStr: %s", machineNameStr);
+                    clientRecords.at(machineNameStr)++;
+                    taskCount++;
+                }
+            }
+        }
     }
+    logSummary(clientRecords);
 }
