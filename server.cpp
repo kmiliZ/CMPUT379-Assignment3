@@ -53,6 +53,39 @@ void logSummary(map<string, int> clientRecords)
     fprintf(fp, "%.1f Transactions/sec (%d/%.2f)", (float)(taskCount - 1) / (duration - 30), taskCount - 1, duration - 30);
 }
 
+void giveAcknowledgement(int n, int fd)
+{
+    char sendBuff[1024] = {'\0'};
+    snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
+
+    int writeBytes = send(fd, sendBuff, strlen(sendBuff), 0);
+    if (writeBytes < 0)
+    {
+        printf("send error\n");
+    }
+}
+
+string performTransaction(char *readbuffer, int fd)
+{
+    int n, pid;
+    char clientName[100] = {'\0'};
+    char machineName[50] = {'\0'};
+    sscanf(readbuffer, MESSAGE_FORMAT, &n, &clientName, &pid);
+    sprintf(machineName, MACHINE_NAME_FORMAT, clientName, pid);
+
+    // log recived
+    logTaskCall(machineName, n);
+
+    // perform work
+    Trans(n);
+
+    giveAcknowledgement(n, fd);
+    logDone(machineName);
+    taskCount++;
+
+    return string(machineName);
+}
+
 int main(int argc, char *argv[])
 {
     startTime = Clock::now();
@@ -60,12 +93,11 @@ int main(int argc, char *argv[])
     int master_socket = 0, connfd, nfds, newfd;
     int client_sockets[MAX_CLIENTS];
     struct sockaddr_in serv_addr;
-    int readBytes, writeBytes;
+    int readBytes;
     struct timeval timeout;
     taskCount = 1;
     map<string, int> clientRecords;
 
-    char sendBuff[1024] = {'\0'};
     char readbuffer[1024] = {'\0'};
 
     if (argc != 2)
@@ -112,14 +144,10 @@ int main(int argc, char *argv[])
         client_sockets[i] = 0;
     }
 
-    timeout.tv_sec = 30;
-    timeout.tv_usec = 0;
-    fp = fopen("server.log", "w");
+    fp = fopen(SERVER_OUTPUT_FILE, "w");
     fprintf(fp, "Using port %d\n", port);
     while (1)
     {
-        printf("wait for a connection\n");
-
         // clear the socket set
         FD_ZERO(&readfds);
 
@@ -140,16 +168,17 @@ int main(int argc, char *argv[])
             if (connfd > nfds)
                 nfds = connfd;
         }
-
+        timeout.tv_sec = 30;
+        timeout.tv_usec = 0;
         int activity = select(nfds + 1, &readfds, NULL, NULL, &timeout);
 
         if (activity < 0)
         {
-            perror("select");
+            perror("select error\n");
         }
         else if (activity == 0)
         {
-            printf("server timeout");
+            printf("server timeout\n");
             break;
         }
 
@@ -158,35 +187,17 @@ int main(int argc, char *argv[])
         {
             if ((newfd = accept(master_socket, (struct sockaddr *)NULL, NULL)) < 0)
             {
-                perror("Accept");
+                perror("Accept\n");
                 exit(EXIT_FAILURE);
             }
+            printf("Client connected\n");
 
-            printf("New connection , socket fd is %d , ip is : %s , port : %d \n ", newfd, inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
-
-            // TODO: read the actual task and n, log to file
             memset(readbuffer, '\0', sizeof readbuffer);
             readBytes = recv(newfd, readbuffer, 1024, 0);
-            // printf("data read: %d bytes\n", readBytes);
-            // printf("Received from server: %s\n", readbuffer);
 
-            int n, pid;
-            char clientName[100] = {'\0'};
-            sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
-            char machineName[50];
-            sprintf(machineName, "%s.%d\0", clientName, pid);
-            logTaskCall(machineName, n);
-
-            // perform work
-            Trans(n);
-
-            snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
-
-            writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
-            logDone(machineName);
+            string machineName = performTransaction(readbuffer, newfd);
 
             clientRecords.emplace(string(machineName), 1);
-            taskCount++;
 
             // add new socket to array of sockets
             for (int i = 0; i < MAX_CLIENTS; i++)
@@ -209,15 +220,11 @@ int main(int argc, char *argv[])
                 // incoming message
                 memset(readbuffer, '\0', sizeof readbuffer);
 
-                readBytes = recv(newfd, readbuffer, 1024, 0);
+                readBytes = recv(connfd, readbuffer, 1024, 0);
 
                 if (readBytes == 0)
                 {
-                    // Somebody disconnected , get his details and print
-                    getpeername(connfd, (struct sockaddr *)&serv_addr,
-                                (socklen_t *)&serv_addr);
-                    printf("Host disconnected , ip %s , port %d \n",
-                           inet_ntoa(serv_addr.sin_addr), ntohs(serv_addr.sin_port));
+                    printf("Client disconnected\n");
 
                     // Close the socket and mark as 0 in list for reuse
                     close(connfd);
@@ -225,35 +232,17 @@ int main(int argc, char *argv[])
                 }
                 else if (readBytes < 0)
                 {
-                    perror("read");
+                    perror("read error\n");
                 }
                 // Echo back the message that came in
                 else
                 {
-                    // set the string terminating NULL byte on the end
-                    // of the data read
-                    int n, pid;
-                    char clientName[100] = {'\0'};
-                    sscanf(readbuffer, "%d %s %d", &n, &clientName, &pid);
-                    char machineName[50] = {'\0'};
-
-                    sprintf(machineName, "%s.%d", clientName, pid);
-
-                    logTaskCall(machineName, n);
-
-                    // perform work
-                    Trans(n);
-
-                    snprintf(sendBuff, sizeof(sendBuff), "D %d", n);
-
-                    writeBytes = send(newfd, sendBuff, strlen(sendBuff), 0);
-                    logDone(machineName);
-
+                    string machineName = performTransaction(readbuffer, connfd);
                     clientRecords.at(string(machineName))++;
-                    taskCount++;
                 }
             }
         }
     }
     logSummary(clientRecords);
+    fclose(fp);
 }

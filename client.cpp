@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     char outPutFileName[50];
-    sprintf(outPutFileName, "%s.%d", hostName, pid);
+    sprintf(outPutFileName, MACHINE_NAME_FORMAT, hostName, pid);
     fp = fopen(outPutFileName, "w");
 
     fprintf(fp, "Using port %d\n", port);
@@ -107,8 +107,12 @@ int main(int argc, char *argv[])
             printf("writing something\n");
             memset(sendBuff, '\0', sizeof sendBuff);
 
-            snprintf(sendBuff, sizeof(sendBuff), "%d %s %d", command_n, hostName, pid);
+            snprintf(sendBuff, sizeof(sendBuff), MESSAGE_FORMAT, command_n, hostName, pid);
             writeBytes = send(sockfd, sendBuff, strlen(sendBuff), 0);
+            if (writeBytes < 0)
+            {
+                printf("Send Error\n");
+            }
 
             logTransactionCall('T', command_n);
             totalTransactions++;
@@ -119,11 +123,11 @@ int main(int argc, char *argv[])
 
             if (readBytes < 0)
             {
-                printf("Read Error");
+                printf("Read Error\n");
             }
             // log receive to file
             logTransactionCall('D', command_n);
-            printf("Received from server: %s\n", ack);
+            printf("Received from server: %s %d\n", ack, n);
         }
         else if (command_type == 'S')
         {
@@ -135,5 +139,6 @@ int main(int argc, char *argv[])
     }
     // log the total Task send to file
     logSummery();
+    fclose(fp);
     return 0;
 }
