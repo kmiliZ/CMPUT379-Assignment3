@@ -83,12 +83,10 @@ void run(int sockfd, pid_t pid)
             }
             // log receive to file
             logTransactionCall('D', command_n);
-            printf("Received from server: %s %d\n", ack, n);
         }
         else if (command_type == 'S')
         {
             logSleep(command_n);
-            printf("recied sleeping...");
             Sleep(command_n);
         }
     }
