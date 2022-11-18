@@ -8,40 +8,34 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <string.h>
 #include <sys/types.h>
 #include <time.h>
-#include "header.h"
 #include <string>
 #include <map>
-#include <chrono>
 #include <cstring>
-#include <iostream>
-using namespace std;
-using namespace chrono;
-typedef system_clock Clock;
+#include "header.h"
 
 FILE *fp;
 int taskCount;
-Clock::time_point startTime;
-
-float getTimeDuration()
-{
-    Clock::time_point now = Clock::now();
-    duration<double> duration = now - startTime;
-    return duration.count();
-}
 
 void logTaskCall(char *clientName, int n)
 {
-    fprintf(fp, "# %3d (T%3d) from %s\n", taskCount, n, clientName);
+    char epochStr[15];
+    memset(epochStr, '\0', sizeof epochStr);
+    getCurrentEpochTime(epochStr);
+
+    fprintf(fp, "%s # %3d (T%3d) from %s\n", epochStr, taskCount, n, clientName);
 }
 void logDone(char *clientName)
 {
-    fprintf(fp, "# %3d (Done) from %s\n", taskCount, clientName);
+    char epochStr[15];
+    memset(epochStr, '\0', sizeof epochStr);
+
+    getCurrentEpochTime(epochStr);
+    fprintf(fp, "%s # %3d (Done) from %s\n", epochStr, taskCount, clientName);
 }
 
-void logSummary(map<string, int> clientRecords)
+void logSummary(map<string, int> clientRecords, Clock::time_point startTime)
 {
 
     fprintf(fp, "SUMMARY\n");
@@ -49,7 +43,7 @@ void logSummary(map<string, int> clientRecords)
     {
         fprintf(fp, "   %3d transactions from %s\n", client.second, client.first.c_str());
     }
-    float duration = getTimeDuration();
+    float duration = getTimeDuration(startTime);
     fprintf(fp, "%.1f Transactions/sec (%d/%.2f)", (float)(taskCount - 1) / (duration - 30), taskCount - 1, duration - 30);
 }
 
@@ -88,7 +82,7 @@ string performTransaction(char *readbuffer, int fd)
 
 int main(int argc, char *argv[])
 {
-    startTime = Clock::now();
+    Clock::time_point startTime = Clock::now();
 
     int master_socket = 0, connfd, nfds, newfd;
     int client_sockets[MAX_CLIENTS];
@@ -107,6 +101,11 @@ int main(int argc, char *argv[])
     }
 
     int port = atoi(argv[1]);
+    if (port > 64000 || port < 5000)
+    {
+        printf("user prot in the range 5000 to 64,000\n");
+        return 1;
+    }
 
     // set of socket descriptors
     fd_set readfds;
@@ -243,6 +242,6 @@ int main(int argc, char *argv[])
             }
         }
     }
-    logSummary(clientRecords);
+    logSummary(clientRecords, startTime);
     fclose(fp);
 }
