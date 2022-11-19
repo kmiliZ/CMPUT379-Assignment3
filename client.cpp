@@ -156,5 +156,6 @@ int main(int argc, char *argv[])
     logSummery();
 
     fclose(fp);
+    printf("Client exited \n");
     return 0;
 }
