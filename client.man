@@ -1,0 +1,20 @@
+.TH CLIENT 1 "NOV 19 2022" "Client Manual Page"
+.SH NAME
+client \- generate transcatiosn and send to the server to exectue
+.SH SYNOPSIS
+\fBclient\fP \fIport\fP \fIip-address\fP
+.SH DESCRIPTION
+\fBclient\fP read from either an input file or command line, then generate
+transactions (T<n>) that get sent to the server to execute. Clients may have lulls between
+transactions, so they wait (S<n>) for a transaction to happen.
+\fIport\fP is the port number that the server will read transcations from (in the range 5000 to
+64,000, the same number that the server uses).
+\fIip-address\fP is the IP (Internet Protocol) address of the machine that is hosting the
+server.
+.SH EXAMPLES
+\fBclient\fP \fI5002\fP \fI129.128.29.41\fP
+starts an clients and attempes to connect to a server at 129.128.29.41 on port 5002
+.SH AUTHOR
+Qi Zhou
+.SH "SEE ALSO"
+server(1)

@@ -1,9 +1,10 @@
 CC = g++
 OBJ = client commands.o server helper.o
+PDF = client.pdf server.pdf
 CFLAGS= -O -Wall -pthread
 C_OBJ = client.cpp commands.o helper.o
 S_OBJ = server.cpp commands.o helper.o
-all: $(OBJ)
+all: $(OBJ) $(PDF)
 
 client:	$(C_OBJ)
 	$(CC) $(CFLAGS) $(C_OBJ) -o client
@@ -16,5 +17,11 @@ commands.o:
 
 helper.o:
 	$(CC) $(CFLAGS) -c helper.cpp
+
+client.pdf:
+	groff -Tpdf -man client.man > client.pdf
+
+server.pdf:
+	groff -Tpdf -man server.man > server.pdf	
 clean:
-	rm -f $(OBJ)
+	rm -f $(OBJ) $(PDF)

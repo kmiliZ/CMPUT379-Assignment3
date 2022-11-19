@@ -1,0 +1,16 @@
+.TH SERVER 1 "NOV 19 2022" "Server Manual Page"
+.SH NAME
+server \- receive and process transcations from clients
+.SH SYNOPSIS
+\fBserver\fP \fIport\fP
+.SH DESCRIPTION
+\fBserver\fP receives the transacations from clients on specified \fIport\fP.Then the server processes them, and waits for the next transction. Server will time out and exit after 30 seconds of no incoming messages.
+\fIport\fP is the port number that the server listens to for communications from clients. The
+port must be in the range 5,000 to 64,000.
+.SH EXAMPLES
+\fBserver\fP \fI5002\fP
+start a server and build socket on port 5002
+.SH AUTHOR
+Qi Zhou
+.SH "SEE ALSO"
+client(1)
