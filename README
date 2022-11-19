@@ -1,3 +1,38 @@
-CMPUT 379 FALL 2022 Assignment 3 Client-Server / Monitoring Name: Qi Zhou CCID: 1629508 Acknowledgement: https: //www.geeksforgeeks.org/socket-programming-cc/
-https: //www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
-https: //www.linuxjournal.com/article/1158
+CMPUT 379 FALL 2022 
+Assignment 3 Client-Server / Monitoring 
+Name: Qi Zhou 
+CCID: 1629508 
+
+Files:
+    README
+    Makefile
+    header.h
+    helper.cpp
+    server.cpp
+    client.cpp
+    commands.cpp
+
+Assumptions:
+    1. port number should be in the range 5000 to 64000
+    2. input files used are in the correct format. input file only contains two type of commands:
+        T<n> Transaction. The parameter is an integer > 0. This command will be sent to the server
+            for processing. The client sits idle waiting for the server to complete the transaction.
+        S<n> Sleep. This command simulates having the client wait between receiving new
+            transactions to process. The client waits for a time determined by integer parameter
+        n, with n between 0 and 100. 
+    3. Maximum number of clients is 30.
+    4. Server will automatically time out and exit afte 30 secs of no incoming transcations from client.
+
+Instruction:
+    1. run make to produce the executables for server and client, and the pdf for manual pages.
+    2. Always run server first. In order to do that, run ./server port, where port is the port number that the server listens to for communications from clients.
+    3. for client, run ./client port ip-address, where ip-address is the IP (Internet Protocol) address of the machine that is hosting the
+    server, and port is the port number that the server will read from. Port should be the same that the server uses. 
+    4. Then you can either direct a input file : ./client port ip-address <Input_File_Name, or give commands by entering in the command line.
+
+Acknowledgement:
+sockets building:
+    https: //www.geeksforgeeks.org/socket-programming-cc/
+    https: //www.geeksforgeeks.org/socket-programming-in-cc-handling-multiple-clients-on-server-without-multi-threading/
+construct manual pages:
+    https: //www.linuxjournal.com/article/1158
