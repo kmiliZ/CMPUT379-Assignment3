@@ -13,7 +13,7 @@ transactions, so they wait (S<n>) for a transaction to happen.
 server.
 .SH EXAMPLES
 \fBclient\fP \fI5002\fP \fI129.128.29.41\fP
-starts an clients and attempes to connect to a server at 129.128.29.41 on port 5002
+starts an clients and attempts to connect to a server at 129.128.29.41 on port 5002
 .SH AUTHOR
 Qi Zhou
 .SH "SEE ALSO"
