@@ -56,7 +56,6 @@ void run(int sockfd, pid_t pid)
     {
         if (command_type == 'T')
         {
-            printf("sending a transaction to server...\n");
             memset(sendBuff, '\0', sizeof sendBuff);
 
             snprintf(sendBuff, sizeof(sendBuff), MESSAGE_FORMAT, command_n, hostName, pid);
