@@ -1,9 +1,5 @@
 // From: www.thegeekstuff.com/2011/12/c-socket-programming
 // Note that port# 5002 is hard-coded into this implementation
-
-// TODO: send T and number n to server
-// TODO: log transactions and recieving events in file
-
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -60,7 +56,7 @@ void run(int sockfd, pid_t pid)
     {
         if (command_type == 'T')
         {
-            printf("writing something\n");
+            printf("sending a transaction to server...\n");
             memset(sendBuff, '\0', sizeof sendBuff);
 
             snprintf(sendBuff, sizeof(sendBuff), MESSAGE_FORMAT, command_n, hostName, pid);
@@ -75,7 +71,7 @@ void run(int sockfd, pid_t pid)
             readBytes = read(sockfd, recvBuff, sizeof(recvBuff));
             int n;
             char ack[3];
-            sscanf(recvBuff, "%s%d", &ack, &n);
+            sscanf(recvBuff, "%s%d", ack, &n);
 
             if (readBytes < 0)
             {
@@ -94,7 +90,7 @@ void run(int sockfd, pid_t pid)
 
 int main(int argc, char *argv[])
 {
-    int sockfd = 0, n = 0;
+    int sockfd = 0;
 
     struct sockaddr_in serv_addr;
     int port;
